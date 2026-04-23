@@ -10,12 +10,13 @@ import { Sales } from './components/sales/sales';
 import { Food } from './components/sales/food/food';
 import { Clothing } from './components/sales/clothing/clothing';
 import { Supplements } from './components/sales/supplements/supplements';
-import { Other } from './components/sales/other/other';
+// import { Other } from './components/sales/other/other';
 import { Accessories } from './components/sales/accessories/accessories';
 import { Veterinarian } from './components/veterinarian/veterinarian';
 import { Adoption } from './components/adoption/adoption';
 import { WantToAdopt } from './components/adoption/want-to-adopt/want-to-adopt';
 import { HaveForAdoption } from './components/adoption/have-for-adoption/have-for-adoption';
+import { All } from './components/lost-and-found/all/all';
 
 export const routes: Routes = [
   { path: '', component: Home },
@@ -27,12 +28,14 @@ export const routes: Routes = [
   { path: 'sales/accessories', component: Accessories },
   { path: 'sales/clothing', component: Clothing },
   { path: 'sales/supplements', component: Supplements },
-  { path: 'sales/other', component: Other },
+  // { path: 'sales/other', component: Other },
   { path: 'veterinarian', component: Veterinarian },
   { path: 'adoption', component: Adoption },
   { path: 'adoption/want', component: WantToAdopt },
   { path: 'adoption/have', component: HaveForAdoption },
+  { path: 'lost-and-found/all', component:All},
   { path: '**', redirectTo: '' }
+
 ];
 
 
