@@ -1,59 +1,103 @@
-# Petty
+# PetApp (PawPaw)
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.7.
+A pet adoption / lost-and-found / pet-shop web app.
 
-## Development server
+- **Frontend**: Angular 21, Bootstrap, Leaflet (`/` - this repo's root)
+- **Backend**: Node.js + Express REST API (`/backend`)
+- **Database**: PostgreSQL
 
-To start a local development server, run:
+## Architecture
 
-```bash
-ng serve
+```
+ Browser
+   |
+   v
+ [frontend] nginx serving the built Angular app
+   | /api/*  (reverse-proxied)
+   v
+ [backend] Express API  --->  [db] PostgreSQL
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+The Angular app always calls a relative `/api/pets/...` URL (see
+`src/environments/environment.ts`). Whatever sits in front of it - the
+`ng serve` dev proxy (`proxy.conf.json`) or nginx (`nginx.conf`, baked into the
+frontend Docker image) - forwards that to the backend. This means the same
+build works unchanged in local dev, Docker Compose, and Kubernetes.
 
-## Code scaffolding
+## Running locally without Docker
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
+Terminal 1 - database (or install Postgres locally and load `backend/src/db/init.sql`):
 ```bash
-ng generate component component-name
+docker run --rm -p 5432:5432 \
+  -e POSTGRES_USER=petapp -e POSTGRES_PASSWORD=petapp -e POSTGRES_DB=petapp \
+  -v "$PWD/backend/src/db/init.sql:/docker-entrypoint-initdb.d/init.sql" \
+  postgres:16-alpine
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
+Terminal 2 - backend:
 ```bash
-ng generate --help
+cd backend
+cp .env.example .env
+npm install
+npm run dev        # http://localhost:8081
 ```
 
-## Building
-
-To build the project run:
-
+Terminal 3 - frontend:
 ```bash
-ng build
+npm install
+npm start           # http://localhost:4200, proxies /api to :8081
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+## Running everything with Docker Compose
 
 ```bash
-ng test
+docker compose up --build
 ```
+- Frontend: http://localhost:8080
+- Backend: http://localhost:8081
+- Postgres: localhost:5432 (user/password/db: `petapp`)
 
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
+## Tests
 
 ```bash
-ng e2e
+npm test                 # frontend (Vitest via Angular CLI)
+cd backend && npm test   # backend (Jest + Supertest, needs a reachable Postgres)
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+## CI/CD
 
-## Additional Resources
+- `.github/workflows/ci.yml` - runs on every push/PR: frontend tests + build,
+  backend tests (against a real Postgres service container), and a
+  build-only check of both Dockerfiles.
+- `.github/workflows/cd.yml` - runs on push to `master`/`main`: builds both
+  Docker images and pushes them to GitHub Container Registry, tagged
+  `:latest` and `:<commit-sha>`.
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## Deploying to Kubernetes
+
+Manifests live in `k8s/` (namespace, Postgres with a PVC, backend, frontend -
+tied together with `kustomization.yaml`). See **[k8s/README.md](k8s/README.md)**
+for step-by-step instructions for a local minikube/kind cluster, including how
+to make the GHCR images pullable and how to roll out a newly-published image.
+
+Quick start once a cluster is running:
+```bash
+kubectl apply -k k8s/
+minikube service frontend -n petapp --url
+```
+
+## Notes on the current state
+
+This project started as a frontend-only prototype (the API calls existed in
+`pet.ts` before there was anything to call). Known gaps worth knowing about:
+
+- Sales pages (food/clothing/supplements/accessories) and the vet page still
+  use hardcoded in-component data - no backend endpoints exist for them yet.
+- The lost-pet "found" flow (`found.ts`) doesn't call the backend yet either;
+  only `lost.ts` and the adoption forms are wired up.
+- No auth - anyone can post a listing or read the adoption-requests list.
+  Fine for a demo/local deployment; add authentication before exposing this
+  publicly.
+- Pet photos are uploaded as base64 data URLs and stored directly in the
+  `pets.image` column. Works, but will bloat the database fast - swapping to
+  object storage (e.g. S3-compatible) is a natural next improvement.
